@@ -1,5 +1,5 @@
 
-## Login and Register MERM
+## Login and Register MERN
 
 This repository contains the source code for a simple User Login and Registaration MERN Application.
 
