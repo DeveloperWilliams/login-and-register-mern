@@ -3,7 +3,6 @@
 
 This repository contains the source code for a simple User Login and Registaration MERN Application.
 
-- Visit the website on [Gym Website](https://william-gym-website.netlify.app/)
 
 ## Technologies Used:
 
