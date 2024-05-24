@@ -1,66 +1,72 @@
-import express from "express"
-import cors from "cors"
-import mongoose from "mongoose"
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import bcrypt from "bcrypt";
 
-const app = express()
-app.use(express.json())
-app.use(express.urlencoded())
-app.use(cors())
+dotenv.config();
 
-mongoose.connect("mongodb://localhost:27017/myLoginRegisterDB", {
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
+const PORT = process.env.PORT || 9002;
+const MONGO_URI = process.env.MONGO_URI;
+
+mongoose.connect(MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
-}, () => {
-    console.log("DB connected")
 })
+.then(() => console.log("DB connected"))
+.catch(err => console.error("DB connection error:", err));
 
 const userSchema = new mongoose.Schema({
-    name: String,
-    email: String,
-    password: String
-})
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true }
+});
 
-const User = new mongoose.model("User", userSchema)
+const User = mongoose.model("User", userSchema);
 
-//Routes
-app.post("/login", (req, res)=> {
-    const { email, password} = req.body
-    User.findOne({ email: email}, (err, user) => {
-        if(user){
-            if(password === user.password ) {
-                res.send({message: "Login Successfull", user: user})
+app.post("/auth/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+
+        if (user) {
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (isMatch) {
+                res.status(200).send({ message: "Login Successful", user });
             } else {
-                res.send({ message: "Password didn't match"})
+                res.status(401).send({ message: "Password didn't match" });
             }
         } else {
-            res.send({message: "User not registered"})
+            res.status(404).send({ message: "User not registered" });
         }
-    })
-}) 
+    } catch (err) {
+        res.status(500).send({ message: "Server Error", error: err.message });
+    }
+});
 
-app.post("/register", (req, res)=> {
-    const { name, email, password} = req.body
-    User.findOne({email: email}, (err, user) => {
-        if(user){
-            res.send({message: "User already registerd"})
+app.post("/auth/register", async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+        const existingUser = await User.findOne({ email });
+
+        if (existingUser) {
+            res.status(409).send({ message: "User already registered" });
         } else {
-            const user = new User({
-                name,
-                email,
-                password
-            })
-            user.save(err => {
-                if(err) {
-                    res.send(err)
-                } else {
-                    res.send( { message: "Successfully Registered, Please login now." })
-                }
-            })
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const newUser = new User({ name, email, password: hashedPassword });
+            await newUser.save();
+            res.status(201).send({ message: "Successfully Registered, Please login now." });
         }
-    })
-    
-}) 
+    } catch (err) {
+        res.status(500).send({ message: "Server Error", error: err.message });
+    }
+});
 
-app.listen(9002,() => {
-    console.log("BE started at port 9002")
-})
+app.listen(PORT, () => {
+    console.log(`Server started at port ${PORT}`);
+});
